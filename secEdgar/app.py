@@ -54,6 +54,16 @@ class SecEdgar:
                 # return the remaining string 
                 res = cik[i::]; 
                 return res; 
+
+    def getFiscalQuarter(self, quarter): #returns the fiscal quarter according to months
+        if quarter == "01" or quarter == "02" or quarter == "03":
+            return 1
+        elif quarter == "04" or quarter == "05" or quarter == "06":
+            return 2
+        elif quarter == "07" or quarter == "08" or quarter == "09":
+            return 3
+        else:
+            return 4
     
     def annual_filing(self,cik,year):
         link = f'https://data.sec.gov/submissions/CIK{cik}.json'
@@ -65,39 +75,64 @@ class SecEdgar:
             accessionNumbers = self.company_info.get('accessionNumber',{})
             filingDates = self.company_info.get('filingDate',{})
             primaryDocuments = self.company_info.get('primaryDocument',{})
-            primaryDocumentDescriptions = self.company_info.get('primaryDocumentDescription',{})
+            primaryDocumentDescriptions = self.company_info.get('primaryDocDescription',{})
 
             ticker = self.cik_to_ticker(cik).lower()
-            tickerLen = len(ticker)
             index = 0
+            cikShort = 0
+            accNum = 0
             finDoc = ""
             
-            for primDoc in primaryDocuments:
-                if primDoc[0:4] == ticker:
-                    if primDoc[5:9] == year:
-                        foundYear = primDoc[5:9]
-                        if primDoc[10:13] == "10k" or primDoc[10:13] == "10q":
-                            index = primaryDocuments.index(primDoc)
-                            finDoc = primDoc
-                            break
+            for docDescription in primaryDocumentDescriptions:
+                if docDescription.find("10-K") != -1 or docDescription.find("10-Q") != -1:
+                        index = primaryDocumentDescriptions.index(docDescription)
+                        if filingDates[index][0:4] == year:
+                            finDoc = primaryDocuments[index]
+                            accNum = (accessionNumbers[index]).replace("-", "")
+                            cikShort = self.removeLeadingZeros(cik)
             
-            accNum = (accessionNumbers[index]).replace("-", "")
-            cikShort = self.removeLeadingZeros(cik)
-
-            return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}"
-
-
-
-
+            if cikShort == 0 or accNum == 0 or finDoc == "":
+                return f"Annual filing not found for company: {ticker.upper()}"
+            else:
+                return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}"
         else:
             print(f"Error fetching data, Status Code {data.status_code}")
 
-
-
-
-
     def quarterly_filing(self, cik, year, quarter):
-        pass
+        link = f'https://data.sec.gov/submissions/CIK{cik}.json'
+        header = {'user-agent': 'MLT GS skelete@ucsc.edu'} #requested by the SEC website in order to gain authorization
+        data = requests.get(link, headers=header) #gets the information from the json file, with our header as a parameter
+        
+        if data.status_code == 200:
+            self.company_info = data.json().get('filings', {}).get('recent',{})
+            accessionNumbers = self.company_info.get('accessionNumber',{})
+            filingDates = self.company_info.get('filingDate',{})
+            primaryDocuments = self.company_info.get('primaryDocument',{})
+            primaryDocumentDescriptions = self.company_info.get('primaryDocDescription',{})
+
+            ticker = self.cik_to_ticker(cik).lower()
+            index = 0
+            cikShort = 0
+            accNum = 0
+            finDoc = ""
+            
+            for docDescription in primaryDocumentDescriptions:
+                if docDescription.find("10-Q") != -1:
+                        index = primaryDocumentDescriptions.index(docDescription)
+                        if filingDates[index][0:4] == year:
+                            month = filingDates[index][5:7]
+                            fiscalQuarter = self.getFiscalQuarter(month)
+                            if fiscalQuarter == quarter:
+                                finDoc = primaryDocuments[index]
+                                accNum = (accessionNumbers[index]).replace("-", "")
+                                cikShort = self.removeLeadingZeros(cik)
+            
+            if cikShort == 0 or accNum == 0 or finDoc == "":
+                return f"Quarterly filing not found for company: {ticker.upper()}"
+            else:
+                return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}"
+        else:
+            print(f"Error fetching data, Status Code {data.status_code}")
 
 se = SecEdgar('https://www.sec.gov/files/company_tickers.json')
 
@@ -106,7 +141,8 @@ print(se.name_to_cik('MICROSOFT CORP'))
 print(se.ticker_to_cik('AAPL'))
 print(se.cik_to_ticker('0001045810'))
 
-print(se.annual_filing('0001045810','2017'))
+print(se.annual_filing('0001045810','2024'))
+print(se.quarterly_filing('0000320193','2024',2))
 
 
 #q = secEdgar()
