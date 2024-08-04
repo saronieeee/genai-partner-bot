@@ -8,7 +8,6 @@ class SecEdgar:
         self.namedict = {}
         self.cikdict = {}
         self.tickerdict = {}
-        self.filingsdict = {}
         self.get_data()
 
     #function to retrieve and organize information into their respective dictionaries for organization
@@ -20,13 +19,9 @@ class SecEdgar:
             self.company_info = data.json()
             for info in self.company_info.values(): #iterate through all company information
                 #sets the information to a local variable
-                cik = info['cik_str'] 
+                cik = str(info['cik_str']).zfill(10)
                 ticker = info['ticker']
                 name = info['title']
-
-                if len(str(cik)) < 9: #zeros added if cik length was less than 10
-                    cikstr = str(cik)
-                    cik = cikstr.zfill(10)
 
                 if cik and ticker and name: #if all information has been set, add the company to the dictionary
                     self.namedict[name.lower()] = (name,ticker,cik)
@@ -48,12 +43,7 @@ class SecEdgar:
         return self.cikdict.get(cik, (None, None, None))[1]
     
     def removeLeadingZeros(self, cik): #removes leading zeros for cik
-        for i in range(len(cik)): 
-            # check for the first non-zero character 
-            if cik[i] != '0': 
-                # return the remaining string 
-                res = cik[i::]; 
-                return res; 
+        return cik.lstrip('0') 
 
     def getFiscalQuarter(self, quarter): #returns the fiscal quarter according to months
         if quarter == "01" or quarter == "02" or quarter == "03":
@@ -115,5 +105,5 @@ print(se.name_to_cik('MICROSOFT CORP'))
 print(se.ticker_to_cik('AAPL'))
 print(se.cik_to_ticker('0001045810'))
 
-print(se.annual_filing('0000320193','2022'))
+print(se.annual_filing('0001045810','2022'))
 print(se.quarterly_filing('0000320193','2023',2))
