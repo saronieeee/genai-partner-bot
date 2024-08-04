@@ -79,70 +79,41 @@ class SecEdgar:
         data = requests.get(link, headers=header) #gets the information from the json file, with our header as a parameter
         return data
     
-    def annual_filing(self,cik,year):
-        data = self.getAuth(cik) # send authorization and receive data 
+    def get_filing_link(self, cik, year, doc_type, quarter=None):
+        data = self.getAuth(cik)  # send authorization and receive data
 
-        if data.status_code == 200: # if data is received succesfully
-            self.company_info = data.json().get('filings', {}).get('recent',{}) #get company's recent filing information
-            company_info = self.get_company_info() # get all necessary arrays that store crucial information
+        if data.status_code == 200:  # if data is received successfully
+            self.company_info = data.json().get('filings', {}).get('recent', {})  # get company's recent filing information
+            company_info = self.get_company_info()  # get all necessary arrays that store crucial information
 
             # local variables used to store desired document information
-            ticker = self.cik_to_ticker(cik).lower() # get the ticker name
-            index = 0
-            cikShort = 0
-            accNum = 0
-            finDoc = ""
-            
-            for docDescription in company_info['primaryDocumentDescriptions']: #cycles through all primary document descriptions
-                if docDescription.find("10-K") != -1: # if the current document is a 10-K, note the index
-                        index = company_info['primaryDocumentDescriptions'].index(docDescription)
-                        if company_info['filingDates'][index][0:4] == year: #if the document is the desired year as well
-                            finDoc = company_info['primaryDocuments'][index] #get the desired primary doc
-                            accNum = (company_info['accessionNumbers'][index]).replace("-", "") # remove the dash marks from the accession number
-                            cikShort = self.removeLeadingZeros(cik) # remove the leading zeros to be used in the link
-            
-            if cikShort == 0 or accNum == 0 or finDoc == "": # check if any of the information is missing
-                return f"Annual filing not found for company: {ticker.upper()}" # return error
-            else:
-                return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}" # return link
+            ticker = self.cik_to_ticker(cik).lower()  # get the ticker name
+            cikShort = self.removeLeadingZeros(cik)  # remove the leading zeros to be used in the link
+
+            for index, docDescription in enumerate(company_info['primaryDocumentDescriptions']):  # cycle through all primary document descriptions
+                if docDescription.find(doc_type) != -1:  # if the current document is the desired type
+                    if company_info['filingDates'][index][0:4] == year and (quarter is None or self.getFiscalQuarter(company_info['filingDates'][index][5:7]) == quarter):
+                        finDoc = company_info['primaryDocuments'][index]  # get the desired primary doc
+                        accNum = company_info['accessionNumbers'][index].replace("-", "")  # remove the dash marks from the accession number
+                        return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}"  # return link
+
+            return f"{doc_type} filing not found for company: {ticker.upper()}"  # return error if not found
         else:
-            print(f"Error fetching data, Status Code {data.status_code}") # if not status code 200, return error
+            print(f"Error fetching data, Status Code {data.status_code}")  # if not status code 200, return error
+
+    def annual_filing(self, cik, year):
+        return self.get_filing_link(cik, year, "10-K")
 
     def quarterly_filing(self, cik, year, quarter):
-        data = self.getAuth(cik)  # send authorization and receive data 
-        
-        if data.status_code == 200:  # if data is received succesfully
-            self.company_info = data.json().get('filings', {}).get('recent',{}) #get company's recent filing information
-            company_info = self.get_company_info() # get all necessary arrays that store crucial information
-            
-            # local variables used to store desired document information
-            ticker = self.cik_to_ticker(cik).lower() # get the ticker name
-            index = 0
-            cikShort = 0
-            accNum = 0
-            finDoc = ""
-            
-            for docDescription in company_info['primaryDocumentDescriptions']:  #cycles through all primary document descriptions
-                if docDescription.find("10-Q") != -1:  # if the current document is a 10-K, note the index
-                    index = company_info['primaryDocumentDescriptions'].index(docDescription) #if the document is the desired year as well
-                    if company_info['filingDates'][index][0:4] == year and self.getFiscalQuarter(company_info['filingDates'][index][5:7]) == quarter:
-                        finDoc = company_info['primaryDocuments'][index]  #get the desired primary doc
-                        accNum = (company_info['accessionNumbers'][index]).replace("-", "") # remove the dash marks from the accession number
-                        cikShort = self.removeLeadingZeros(cik)# remove the leading zeros to be used in the link
-            
-            if cikShort == 0 or accNum == 0 or finDoc == "": # check if any of the information is missing
-                return f"Quarterly filing not found for company: {ticker.upper()}" # return error
-            else:
-                return f"https://www.sec.gov/Archives/edgar/data/{cikShort}/{accNum}/{finDoc}"  # return link
-        else:
-            print(f"Error fetching data, Status Code {data.status_code}") # if not status code 200, return error
+        return self.get_filing_link(cik, year, "10-Q", quarter)
+
 
 se = SecEdgar('https://www.sec.gov/files/company_tickers.json')
 
 
-#print(se.name_to_cik('MICROSOFT CORP'))
-#print(se.ticker_to_cik('AAPL'))
-#print(se.cik_to_ticker('0001045810'))
+print(se.name_to_cik('MICROSOFT CORP'))
+print(se.ticker_to_cik('AAPL'))
+print(se.cik_to_ticker('0001045810'))
 
-print(se.annual_filing('0001045810','2024'))
-#print(se.quarterly_filing('0000320193','2024',2))
+print(se.annual_filing('0000320193','2022'))
+print(se.quarterly_filing('0000320193','2023',2))
