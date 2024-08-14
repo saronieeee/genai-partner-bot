@@ -1,4 +1,7 @@
 import requests
+import boto3
+import json
+
 
 #retrieves data from the U.S. Securities and Exchange Commission (SEC) and returns a company's CIK
 class SecEdgar:
@@ -96,10 +99,33 @@ class SecEdgar:
 
     def quarterly_filing(self, cik, year, quarter):
         return self.get_filing_link(cik, year, "10-Q", quarter)
-
+    
+    def lambda_handler(event, context):
+        s3 = boto3.client('s3')
+        url = "https://www.sec.gov/files/company_tickers.json"  # replace with the actual URL
+        response = requests.get(url)
+        s3.put_object(Bucket='sec-edgar-data-bucket', Key='company_tickers.json', Body=response.content)
+    
+    def lambda_handler(event, context):
+        request_type = event['request_type']
+        company = event['company']
+        year = event['year']
+        
+        
+        if request_type == 'Annual':
+            # process annual request
+            document = event.annual_filing(company, year)
+        elif request_type == 'Quarter':
+            quarter = event['quarter']
+            # process quarterly request
+            document = event.quarterly_filing(company, year, quarter)
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps(document)
+        }
 
 se = SecEdgar('https://www.sec.gov/files/company_tickers.json')
-
 
 print(se.name_to_cik('MICROSOFT CORP'))
 print(se.ticker_to_cik('AAPL'))
